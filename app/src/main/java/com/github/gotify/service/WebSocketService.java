@@ -30,7 +30,9 @@ import com.github.gotify.log.Log;
 import com.github.gotify.log.UncaughtExceptionHandler;
 import com.github.gotify.messages.Extras;
 import com.github.gotify.messages.MessagesActivity;
+import com.github.gotify.messages.provider.MessageFacade;
 import com.github.gotify.picasso.PicassoHandler;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -111,15 +113,12 @@ public class WebSocketService extends Service {
                         .onBadRequest(this::onBadRequest)
                         .onNetworkFailure(
                                 (min) -> foreground(getString(R.string.websocket_failed, min)))
-                        .onDisconnect(this::onDisconnect)
                         .onMessage(this::onMessage)
                         .onReconnected(this::notifyMissedNotifications)
                         .start();
 
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
-        ReconnectListener receiver = new ReconnectListener(this::doReconnect);
-        registerReceiver(receiver, intentFilter);
 
         picassoHandler.updateAppIds();
     }
@@ -140,10 +139,6 @@ public class WebSocketService extends Service {
                                         this.doReconnect();
                                     }
                                 }));
-    }
-
-    private void onDisconnect() {
-        foreground(getString(R.string.websocket_no_network));
     }
 
     private void doReconnect() {
@@ -170,10 +165,23 @@ public class WebSocketService extends Service {
 
         List<Message> messages = missingMessageUtil.missingMessages(messageId);
 
-        if (messages.size() > 5) {
-            onGroupedMessages(messages);
-        } else {
+        List<Message> filteredMessages = new ArrayList<>();
+
+        try (MessagingDatabase db = new MessagingDatabase(this)) {
             for (Message message : messages) {
+                String connectorToken = db.getTokenFromId(message.getAppid());
+                if (!connectorToken.isEmpty()) {
+                    forward(message, connectorToken);
+                } else {
+                    filteredMessages.add(message);
+                }
+            }
+        }
+
+        if (filteredMessages.size() > 5) {
+            onGroupedMessages(filteredMessages);
+        } else {
+            for (Message message : filteredMessages) {
                 onMessage(message);
             }
         }
@@ -202,7 +210,16 @@ public class WebSocketService extends Service {
             lastReceivedMessage.set(message.getId());
         }
 
+        try (MessagingDatabase db = new MessagingDatabase(this)) {
+            String connectorToken = db.getTokenFromId(message.getAppid());
+            if (!connectorToken.isEmpty()) {
+                forward(message, connectorToken);
+                return;
+            }
+        }
+
         broadcast(message);
+
         showNotification(
                 message.getId(),
                 message.getTitle(),
@@ -210,6 +227,23 @@ public class WebSocketService extends Service {
                 message.getPriority(),
                 message.getExtras(),
                 message.getAppid());
+    }
+
+    private void forward(Message message, String token) {
+        Log.i("Forward message to " + token);
+        PushNotificationKt.sendMessage(this, token, message.getMessage());
+        broadcast(message);
+        deleteMessage(message);
+    }
+
+    private void deleteMessage(Message message) {
+        Log.i("Deleting " + message.getId());
+        ApiClient client =
+                ClientFactory.clientToken(settings.url(), settings.sslSettings(), settings.token());
+
+        MessageFacade messages = new MessageFacade(client.createService(MessageApi.class), null);
+        messages.deleteLocal(message);
+        messages.commitDelete();
     }
 
     private void broadcast(Message message) {

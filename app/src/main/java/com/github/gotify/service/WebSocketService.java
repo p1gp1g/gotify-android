@@ -32,7 +32,6 @@ import com.github.gotify.messages.Extras;
 import com.github.gotify.messages.MessagesActivity;
 import com.github.gotify.messages.provider.MessageFacade;
 import com.github.gotify.picasso.PicassoHandler;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

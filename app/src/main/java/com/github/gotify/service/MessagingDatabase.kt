@@ -85,7 +85,8 @@ class MessagingDatabase(context: Context) : SQLiteOpenHelper(context, DB_NAME, n
                 null,
                 null
         ).use { cursor ->
-            if (cursor.moveToFirst()) cursor.getString(cursor.getColumnIndex(FIELD_CONNECTOR_TOKEN)) else ""
+            val column = cursor.getColumnIndex(FIELD_CONNECTOR_TOKEN)
+            if (cursor.moveToFirst() && column >= 0) cursor.getString(column) else ""
         }
     }
 
@@ -103,7 +104,8 @@ class MessagingDatabase(context: Context) : SQLiteOpenHelper(context, DB_NAME, n
                 null,
                 null
         ).use { cursor ->
-            if (cursor.moveToFirst()) cursor.getString(cursor.getColumnIndex(FIELD_PACKAGE_NAME)) else ""
+            val column = cursor.getColumnIndex(FIELD_PACKAGE_NAME)
+            if (cursor.moveToFirst() && column >= 0) cursor.getString(column) else ""
         }
     }
 
@@ -121,7 +123,8 @@ class MessagingDatabase(context: Context) : SQLiteOpenHelper(context, DB_NAME, n
                 null,
                 null
         ).use { cursor ->
-            if (cursor.moveToFirst()) cursor.getLong(cursor.getColumnIndex(FIELD_APP_ID)) else -1
+            val column = cursor.getColumnIndex(FIELD_APP_ID)
+            if (cursor.moveToFirst() && column >= 0) cursor.getLong(column) else -1
         }
     }
 
@@ -139,7 +142,8 @@ class MessagingDatabase(context: Context) : SQLiteOpenHelper(context, DB_NAME, n
                 null,
                 null
         ).use { cursor ->
-            if (cursor.moveToFirst()) cursor.getString(cursor.getColumnIndex(FIELD_GOTIFY_TOKEN)) else ""
+            val column = cursor.getColumnIndex(FIELD_GOTIFY_TOKEN)
+            if (cursor.moveToFirst() && column >= 0) cursor.getString(column) else ""
         }
         return token
     }
